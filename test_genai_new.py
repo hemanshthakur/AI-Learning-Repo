@@ -1,4 +1,5 @@
 from google import genai
+import json
 
 # Create Gemini client
 client = genai.Client(api_key="AIzaSyAZZ1O3p2WFusyXqLYqdAfI6NeJt6fL440")
@@ -9,35 +10,39 @@ def analyze_ticket(issue):
     prompt = f"""
     You are a senior support engineer.
 
-    Analyze the following support issue carefully.
+    Analyze the issue and return ONLY valid JSON.
 
-    Return your answer STRICTLY in this format:
+    Return this exact structure:
 
-    Severity: <Low/Medium/High/Critical>
-
-    Summary:
-    <short summary>
-
-    Possible Causes:
-    - cause 1
-    - cause 2
-    - cause 3
-
-    Suggested Fixes:
-    - fix 1
-    - fix 2
-    - fix 3
+    {{
+    "severity": "",
+    "summary": "",
+    "possible_causes": [],
+    "suggested_fixes": []
+    }}
 
     Issue:
     {issue}
     """
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=prompt
+        )
+        data = json.loads(response.text)
+        return data
+    except json.JSONDecodeError:
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash",
-        contents=prompt
-    )
+        print("ERROR: AI returned invalid JSON.")
 
-    return response.text
+        return None
+
+    except Exception as e:
+
+        print("ERROR:", e)
+
+        return None
+
 
 
 # Get user input
@@ -46,6 +51,19 @@ issue = input("Enter support issue: ")
 # Analyze issue
 result = analyze_ticket(issue)
 
-# Print output
-print("\nAI ANALYSIS:\n")
-print(result)
+# Check result
+if result:
+
+    print("\nSeverity:")
+    print(result["severity"])
+
+    print("\nSummary:")
+    print(result["summary"])
+
+    print("\nPossible Causes:")
+    for cause in result["possible_causes"]:
+        print("-", cause)
+
+    print("\nSuggested Fixes:")
+    for fix in result["suggested_fixes"]:
+        print("-", fix)
