@@ -1,89 +1,110 @@
-from dotenv import load_dotenv
-import os
 import streamlit as st
-import json
-from google import genai
+from ai_engine import analyze_ticket
 
-load_dotenv()
-
-# Configure Gemini client
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-
-# Function to analyze ticket
-def analyze_ticket(issue):
-
-    prompt = f"""
-    You are a senior support engineer.
-
-    Analyze the issue and return ONLY valid JSON.
-
-    Return this exact structure:
-
-    {{
-      "severity": "",
-      "summary": "",
-      "possible_causes": [],
-      "suggested_fixes": []
-    }}
-
-    Issue:
-    {issue}
-    """
-
-    try:
-
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt
-        )
-
-        data = json.loads(response.text)
-
-        return data
-
-    except Exception as e:
-
-        st.error(f"Error: {e}")
-
-        return None
-
-
-# App title
 st.title("AI Support Ticket Assistant")
 
 
-# User input
+if "ticket_history" not in st.session_state:
+
+    st.session_state.ticket_history = []
+
 issue = st.text_area("Enter support issue")
 
 
-# Analyze button
-if st.button("Analyze Ticket"):
+def get_severity_color(severity):
 
+    severity = severity.upper()
+
+    if severity == "CRITICAL":
+        return "red"
+
+    elif severity == "HIGH":
+        return "orange"
+
+    elif severity == "MEDIUM":
+        return "gold"
+
+    elif severity == "LOW":
+        return "green"
+
+    return "gray"
+
+
+
+if st.button("Analyze Ticket"):
     if issue:
 
         with st.spinner("Analyzing issue..."):
 
             result = analyze_ticket(issue)
+            if "error" in result:
 
-        if result:
+                st.error(result["error"])
 
-            st.subheader("Severity")
-            st.write(result["severity"])
+            else:
+                severity = result["severity"]
 
-            st.subheader("Summary")
-            st.write(result["summary"])
+                color = get_severity_color(severity)
 
-            st.subheader("Possible Causes")
+                st.markdown(
+                    f"""
+                    ### Severity:
+                    <span style='color:{color}; font-size:24px; font-weight:bold;'>
+                    {severity}
+                    </span>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-            for cause in result["possible_causes"]:
-                st.write("-", cause)
+                st.subheader("Summary:")
+                st.write(result["summary"])
 
-            st.subheader("Suggested Fixes")
+                st.subheader("Possible Causes:")
+                for cause in result["possible_causes"]:
+                   st.markdown(f"- {cause}")
 
-            for fix in result["suggested_fixes"]:
-                st.write("-", fix)
+                st.subheader("Suggested Fixes:")
+                for fix in result["suggested_fixes"]:
+                    st.markdown(f"- {fix}")
 
+                st.session_state.ticket_history.append(
+                {
+                    "issue": issue,
+                    "severity": result["severity"],
+                    "summary": result["summary"]
+                }
+)
+    
     else:
-
         st.warning("Please enter a support issue.")
+
+st.divider()
+
+st.header("Ticket History")
+
+if st.session_state.ticket_history:
+
+    for ticket in reversed(st.session_state.ticket_history):
+
+        color = get_severity_color(ticket["severity"])
+
+        st.markdown(
+            f"""
+            <span style='color:{color}; font-size:20px; font-weight:bold;'>
+            {ticket["severity"]}
+            </span>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.write("Issue:")
+        st.write(ticket["issue"])
+
+        st.write("Summary:")
+        st.write(ticket["summary"])
+
+        st.divider()
+
+else:
+
+    st.write("No ticket history yet.")
