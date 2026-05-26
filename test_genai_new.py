@@ -4,7 +4,7 @@ import json
 # Create Gemini client
 client = genai.Client(api_key="AIzaSyAZZ1O3p2WFusyXqLYqdAfI6NeJt6fL440")
 
-
+# returns formatted json output
 def analyze_ticket(issue):
 
     prompt = f"""
