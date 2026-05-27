@@ -1,15 +1,19 @@
 import streamlit as st
 from ai_engine import analyze_ticket
+from database import (
+    save_ticket,
+    get_all_tickets,
+    delete_ticket
+)
 
 st.title("AI Support Ticket Assistant")
 
 
-if "ticket_history" not in st.session_state:
+with st.form("ticket_form", clear_on_submit=True):
 
-    st.session_state.ticket_history = []
+    issue = st.text_area("Enter support issue")
 
-issue = st.text_area("Enter support issue")
-
+    submitted = st.form_submit_button("Analyze Ticket")
 
 def get_severity_color(severity):
 
@@ -31,7 +35,7 @@ def get_severity_color(severity):
 
 
 
-if st.button("Analyze Ticket"):
+if submitted:
     if issue:
 
         with st.spinner("Analyzing issue..."):
@@ -40,9 +44,15 @@ if st.button("Analyze Ticket"):
             if "error" in result:
 
                 st.error(result["error"])
+                
 
             else:
                 severity = result["severity"]
+                save_ticket(
+                    issue,
+                    severity,
+                    result["summary"]
+                )
 
                 color = get_severity_color(severity)
 
@@ -66,14 +76,6 @@ if st.button("Analyze Ticket"):
                 st.subheader("Suggested Fixes:")
                 for fix in result["suggested_fixes"]:
                     st.markdown(f"- {fix}")
-
-                st.session_state.ticket_history.append(
-                {
-                    "issue": issue,
-                    "severity": result["severity"],
-                    "summary": result["summary"]
-                }
-)
     
     else:
         st.warning("Please enter a support issue.")
@@ -81,27 +83,37 @@ if st.button("Analyze Ticket"):
 st.divider()
 
 st.header("Ticket History")
+tickets = get_all_tickets()
 
-if st.session_state.ticket_history:
 
-    for ticket in reversed(st.session_state.ticket_history):
 
-        color = get_severity_color(ticket["severity"])
+if tickets:
+
+    for ticket in tickets:
+
+        ticket_id, issue, severity, summary = ticket
+
+        color = get_severity_color(severity)
 
         st.markdown(
             f"""
+            Severity:
             <span style='color:{color}; font-size:20px; font-weight:bold;'>
-            {ticket["severity"]}
+            {severity}
             </span>
             """,
             unsafe_allow_html=True
         )
 
         st.write("Issue:")
-        st.write(ticket["issue"])
+        st.write(issue)
 
         st.write("Summary:")
-        st.write(ticket["summary"])
+        st.write(summary)
+
+        if st.button("Delete",key=f"delete_{ticket_id}"):
+            delete_ticket(ticket_id)
+            st.rerun()
 
         st.divider()
 
